@@ -1,0 +1,44 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "Armazenamento privado de arquivos com controle de acesso e preservacao de versoes",
+  "Parameters": {
+    "Ambiente": {"Type": "String", "Default": "desenvolvimento", "AllowedValues": ["desenvolvimento", "homologacao", "producao"]}
+  },
+  "Resources": {
+    "Arquivos": {
+      "Type": "AWS::S3::Bucket",
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+      "Properties": {
+        "BucketEncryption": {"ServerSideEncryptionConfiguration": [{"ServerSideEncryptionByDefault": {"SSEAlgorithm": "AES256"}}]},
+        "OwnershipControls": {"Rules": [{"ObjectOwnership": "BucketOwnerEnforced"}]},
+        "PublicAccessBlockConfiguration": {"BlockPublicAcls": true, "BlockPublicPolicy": true, "IgnorePublicAcls": true, "RestrictPublicBuckets": true},
+        "VersioningConfiguration": {"Status": "Enabled"},
+        "Tags": [{"Key": "Aplicacao", "Value": "cofre-de-arquivos"}, {"Key": "Ambiente", "Value": {"Ref": "Ambiente"}}]
+      }
+    },
+    "TransporteSeguro": {
+      "Type": "AWS::S3::BucketPolicy",
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+      "Properties": {
+        "Bucket": {"Ref": "Arquivos"},
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [{
+            "Sid": "RecusarTransporteInseguro",
+            "Effect": "Deny",
+            "Principal": "*",
+            "Action": "s3:*",
+            "Resource": [{"Fn::GetAtt": ["Arquivos", "Arn"]}, {"Fn::Sub": "${Arquivos.Arn}/*"}],
+            "Condition": {"Bool": {"aws:SecureTransport": "false"}}
+          }]
+        }
+      }
+    }
+  },
+  "Outputs": {
+    "NomeBucket": {"Description": "Nome atribuido pelo CloudFormation", "Value": {"Ref": "Arquivos"}},
+    "ArnBucket": {"Description": "ARN para autorizacoes futuras com escopo minimo", "Value": {"Fn::GetAtt": ["Arquivos", "Arn"]}}
+  }
+}
